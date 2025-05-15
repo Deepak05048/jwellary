@@ -2,6 +2,11 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import { v2 as cloudinary } from "cloudinary";
+import bcrypt from "bcrypt";
+
+import jwt from "jsonwebtoken";
+
+const saltRounds = 10;
 
 import multer from "multer";
 const upload = multer({ dest: "uploads/" });
@@ -71,6 +76,18 @@ const productSchema = new mongoose.Schema({
 
 //Product Table
 const ProductTable = mongoose.model("ProductTable", productSchema);
+
+//User schema
+const userSchema = new mongoose.Schema({
+  fullName: { type: String, required: true },
+  userName: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  phoneNumber: { type: Number, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, required: true }, //admin/user
+});
+
+const UserTable = mongoose.model("UserTable", userSchema);
 
 //Category Routes
 //Create
@@ -468,6 +485,192 @@ app.delete("/api/products/:id", async (req, res) => {
       success: true,
       data: deletedProduct,
       msg: "deleted  product successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      data: null,
+      msg: "Something went wrong",
+      error: error,
+    });
+  }
+});
+
+//User Route
+//1.Create/Register user
+app.post("/api/users/register", async (req, res) => {
+  try {
+    const userExistWithUser = await UserTable.findOne({
+      email: req.body.email,
+    });
+    if (userExistWithUser) {
+      return res.status(409).json({
+        success: false,
+        msg: "User already exist with email please choose another email",
+        data: null,
+      });
+    }
+
+    const userExistWithUserName = await UserTable.findOne({
+      email: req.body.userName,
+    });
+    if (userExistWithUserName) {
+      return res.status(409).json({
+        success: false,
+        msg: "User already exist with email please choose another username",
+        data: null,
+      });
+    }
+
+    const userExistWithPhoneNumber = await UserTable.findOne({
+      email: req.body.phoneNumber,
+    });
+    if (userExistWithPhoneNumber) {
+      return res.status(409).json({
+        success: false,
+        msg: "User already exist with email please choose another phone number",
+        data: null,
+      });
+    }
+
+    const salt = bcrypt.genSaltSync(saltRounds);
+    const hashedPassword = bcrypt.hashSync(req.body.password, salt);
+
+    console.log(hashedPassword);
+
+    const newlyCreatedUser = await UserTable.create({
+      ...req.body,
+      password: hashedPassword,
+    });
+    return res.status(200).json({
+      success: true,
+      msg: "You have been registered successfully",
+      data: newlyCreatedUser,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      data: null,
+      msg: "Something went wrong",
+      error: error,
+    });
+  }
+});
+
+//2.Sign in /Login user
+app.post("/api/users/login", async (req, res) => {
+  try {
+    const userExist = await UserTable.findOne({ email: req.body.email });
+    if (!userExist) {
+      return res.status(404).json({
+        success: false,
+        msg: "Please register before login",
+        data: null,
+      });
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      req.body.password,
+      userExist.password
+    );
+    console.log(passwordMatch);
+    if (!passwordMatch) {
+      return res.status(404).json({
+        success: false,
+        msg: "Password doesnot match",
+        data: null,
+      });
+    }
+
+    const myToken = jwt.sign(
+      {
+        data: req.body.email,
+      },
+      "bjkhjjhfa1234",
+      { expiresIn: "24h" }
+    );
+    return res.status(200).json({
+      success: true,
+      msg: "Login successfully",
+      data: myToken,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      data: null,
+      msg: "Something went wrong",
+      error: error,
+    });
+  }
+});
+
+//3.Update user/Change password
+app.patch("/api/users/update", async (req, res) => {
+  try {
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      data: null,
+      msg: "Something went wrong",
+      error: error,
+    });
+  }
+});
+
+//4.Delete user
+app.delete("/api/users/delete", async (req, res) => {
+  try {
+    const deletedUser = await UserTable.findByIdAndDelete(req.params.id);
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        success: false,
+        msg: "User not found",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      msg: "User deleted successfully",
+      data: deletedUser,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      data: null,
+      msg: "Something went wrong",
+      error: error,
+    });
+  }
+});
+
+//5.Get all users
+app.get("/api/users", async (req, res) => {
+  try {
+    const allUsers = await UserTable.find();
+    return res.status(200).json({
+      success: true,
+      msg: "All users get successfully",
+      data: allUsers,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      data: null,
+      msg: "Something went wrong",
+      error: error,
+    });
+  }
+});
+//6.Get single user
+app.get("/api/users/:id", async (req, res) => {
+  try {
+    const singleUser = await UserTable.findById(req.params.id);
+    return res.status(200).json({
+      success: true,
+      msg: "Get single user success",
+      data: singleUser,
     });
   } catch (error) {
     return res.status(500).json({
