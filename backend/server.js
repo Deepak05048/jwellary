@@ -605,8 +605,35 @@ app.post("/api/users/login", async (req, res) => {
 });
 
 //3.Update user/Change password
-app.patch("/api/users/update", async (req, res) => {
+app.patch("/api/users/update/:id", async (req, res) => {
   try {
+    //user trying to change password
+    if (req.body.password) {
+      const salt = bcrypt.genSaltSync(saltRounds);
+      const newHashedPassword = bcrypt.hashSync(req.body.password, salt);
+
+      const updatedUser = await UserTable.findByIdAndUpdate(
+        { ...req.body, password: newHashedPassword },
+        { new: true }
+      );
+
+      return res.status(200).json({
+        success: true,
+        msg: "User updated successfully",
+        data: updatedUser,
+      });
+    }
+
+    const updatedUser = await UserTable.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    return res.status(200).json({
+      success: true,
+      msg: "User updated successfully",
+      data: updatedUser,
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
